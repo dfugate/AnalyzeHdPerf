@@ -1,6 +1,22 @@
-import sys
+# ----------------------------------------------------------------------------------------------------------------------
+# Copyright (C) 2015 David Fugate dave.fugate@gmail.com
+#
+# This work is licensed under the Creative Commons
+# Attribution-NonCommercial-NoDerivs 3.0 Unported License. To view a copy of
+# this license, visit http://creativecommons.org/licenses/by-nc-nd/3.0/ or send
+# a letter to Creative Commons, PO Box 1866, Mountain View, CA 94042, USA.
+# ----------------------------------------------------------------------------------------------------------------------
 
-from Common import *
+import sys
+import logging
+
+from socket import gethostname
+from argparse import ArgumentParser
+from datetime import datetime
+from time import sleep
+
+from perf_analyzer import *
+from perf_analyzer.ClientInfo import ClientInfo
 
 try:
     import bottle
@@ -10,32 +26,115 @@ except ImportError, e:
     sys.exit(1)
 
 
+# ----------------------------------------------------------------------------------------------------------------------
+
 class Server(object):
-    def __init__(self, num_clients):
+    """
+    Benchmark Controller class.
+
+    Controls execution of benchmarks on client machines and also handles incoming
+    HTTP requests.
+    """
+    def __init__(self,
+                 client_hostnames,
+                 benchmark_time,
+                 chunk_size,
+                 file_size,
+                 heartbeat_interval,
+                 monitoring_interval,
+                 port
+                 ):
         """
         Constructor
-        :return: Instance of Server
+        :param client_hostnames: List of clients to run the benchmarks on.
+        :param benchmark_time: Time (seconds) to run the benchmark for before stopping.
+        :param chunk_size: Amount of data (bytes) to write on each client before flushing to disk.
+        :param file_size: Total size (bytes) of each file created by a client.
+        :param heartbeat_interval: Time (seconds) a client is to wait before periodically contacting the server.
+        :param monitoring_interval: Time (seconds) a client waits before periodically sending the server perf. data.
+        :param port: TCP port number to run the HTTP server on.
+        :return: Instance of this class.
         """
-        self.num_clients = num_clients
-        self.client_sessions = {}
+        self.client_hostnames = client_hostnames
+        self.benchmark_time = benchmark_time
+        self.chunk_size = chunk_size
+        self.file_size = file_size
+        self.heartbeat_duration = heartbeat_interval
+        self.monitoring_interval = monitoring_interval
+        self.port = port
+
+        self.hostname = gethostname()
+        # Holds client performance data in memory.
+        self.client_info_dict = {}
+
+        self.started = None
+        self.stopped = None
+
+        self.l = logging.getLogger('server')
+        lh = logging.StreamHandler(sys.stdout)
+        lf = logging.Formatter(LOG_FORMAT)
+        lh.setFormatter(lf)
+        self.l.addHandler(lh)
+        self.l.setLevel(logging.DEBUG)
+
+    def run_benchmarks(self):
+        """
+        Asynchronously run the benchmarks in parallel on all clients.
+        :return: None.
+        """
+        i = 0
+        for client_host in self.client_hostnames:
+            # Each client gets a different chunk_size-size.
+            client_chunk_size = self.chunk_size * (2 ** i)
+            client_id = self.__get_client_id(client_host, client_chunk_size)
+            self.client_info_dict[client_id] = ClientInfo(client_host,
+                                                          self.port,
+                                                          self.benchmark_time,
+                                                          client_chunk_size,
+                                                          self.file_size,
+                                                          self.heartbeat_duration,
+                                                          self.monitoring_interval)
+            i += 1
+
+        sleep(10)  # Give the system some time to become stable
+        self.l.debug("Starting benchmarks now...")
+        self.started = datetime.utcnow()
+        for ci in self.client_info_dict.values():
+            ci.run()
+
+        # TODO - kickoff monitoring thread.
+
+    def main(self):
+        """
+        Main HTML page for the benchmark suite.
+        :return:
+        """
+        return bottle.template('main')
 
     def hello(self):
         """
-        Tells the client if the server is operational.
+        Tells the client if the server is alive.
         :return: "Hello!"
         """
-        return '<p>Hello!</p>'
+        return {'hello': 'world'}
 
     def client_heartbeat(self):
         """
-        Client heartbeat.
+        Client heartbeat_duration.
         :return: Nothing.
         """
-        hostname = bottle.request.json[HOSTNAME]
-        pid = bottle.request.json[PID]
-        timestamp = bottle.request.json[TIMESTAMP]
+        client_host = bottle.request.json[HOSTNAME]
+        chunk = bottle.request.json[CHUNK]
+        client_id = self.__get_client_id(client_host, chunk)
 
-        print "TODO - heartbeat ", hostname, pid, timestamp
+        if not (client_id in self.client_info_dict):
+            self.l.error("Unexpected client heartbeat - %s" % client_id)
+        else:
+            ts_str = bottle.request.json[TIMESTAMP]
+            ts = datetime.strptime(ts_str, DATETIME_FORMAT)
+            client_info = self.client_info_dict[client_id]
+            client_info.heartbeats.append(ts)
+            self.l.info("Client heartbeat - %s at %s" % (client_id, ts.isoformat()))
 
         return {}
 
@@ -44,11 +143,18 @@ class Server(object):
         Client has started running a benchmark.
         :return: Nothing.
         """
-        hostname = bottle.request.json[HOSTNAME]
-        pid = bottle.request.json[PID]
-        timestamp = bottle.request.json[TIMESTAMP]
+        client_host = bottle.request.json[HOSTNAME]
+        chunk = bottle.request.json[CHUNK]
+        client_id = self.__get_client_id(client_host, chunk)
 
-        print "TODO - start ", hostname, pid, timestamp
+        if not (client_id in self.client_info_dict):
+            self.l.error("Unexpected client start - %s" % client_id)
+        else:
+            ts_str = bottle.request.json[TIMESTAMP]
+            ts = datetime.strptime(ts_str, DATETIME_FORMAT)
+            client_info = self.client_info_dict[client_id]
+            client_info.started = ts
+            self.l.info("Client start - %s at %s" % (client_id, ts.isoformat()))
 
         return {}
 
@@ -57,11 +163,19 @@ class Server(object):
         Client has stopped running a benchmark.
         :return: Nothing.
         """
-        hostname = bottle.request.json[HOSTNAME]
-        pid = bottle.request.json[PID]
-        timestamp = bottle.request.json[TIMESTAMP]
+        client_host = bottle.request.json[HOSTNAME]
+        chunk = bottle.request.json[CHUNK]
+        client_id = self.__get_client_id(client_host, chunk)
 
-        print "TODO - stop ", hostname, pid, timestamp
+        if not (client_id in self.client_info_dict):
+            self.l.error("Unexpected client stop - %s" % client_id)
+        else:
+            ts_str = bottle.request.json[TIMESTAMP]
+            ts = datetime.strptime(ts_str, DATETIME_FORMAT)
+            client_info = self.client_info_dict[client_id]
+            client_info.stopped = ts
+            client_info.done = True
+            self.l.info("Client stop - %s at %s" % (client_id, ts.isoformat()))
 
         return {}
 
@@ -70,13 +184,23 @@ class Server(object):
         Client has told us it's current resource usage.
         :return: Nothing.
         """
-        hostname = bottle.request.json[HOSTNAME]
-        pid = bottle.request.json[PID]
-        timestamp = bottle.request.json[TIMESTAMP]
-        cpu_util = bottle.request.json[CPU_UTIL]
-        mem_usage = bottle.request.json[MEM_USAGE]
+        client_host = bottle.request.json[HOSTNAME]
+        chunk = bottle.request.json[CHUNK]
+        client_id = self.__get_client_id(client_host, chunk)
 
-        print "TODO - resources ", hostname, pid, timestamp, cpu_util, mem_usage
+        if not (client_id in self.client_info_dict):
+            self.l.error("Unexpected client resource reporting - %s" % client_id)
+        else:
+            ts_str = bottle.request.json[TIMESTAMP]
+            ts = datetime.strptime(ts_str, DATETIME_FORMAT)
+            cpu_util = bottle.request.json[CPU_UTIL]
+            mem_usage = bottle.request.json[MEM_USAGE]
+
+            client_info = self.client_info_dict[client_id]
+            client_info.resources.append(
+                [ts, cpu_util, mem_usage]
+            )
+            self.l.info("Client resource reporting - %s at %s" % (client_id, ts.isoformat()))
 
         return {}
 
@@ -85,36 +209,94 @@ class Server(object):
         Client has told us it's done writing a file.
         :return: Nothing.
         """
-        hostname = bottle.request.json[HOSTNAME]
-        pid = bottle.request.json[PID]
-        timestamp = bottle.request.json[TIMESTAMP]
-        file_size = bottle.request.json[FILE_SIZE]
+        client_host = bottle.request.json[HOSTNAME]
         chunk = bottle.request.json[CHUNK]
+        client_id = self.__get_client_id(client_host, chunk)
 
-        print "TODO - rollover ", hostname, pid, timestamp, file_size, chunk
+        if not (client_id in self.client_info_dict):
+            self.l.error("Unexpected client rollover reporting - %s" % client_id)
+        else:
+            ts_str = bottle.request.json[TIMESTAMP]
+            ts = datetime.strptime(ts_str, DATETIME_FORMAT)
+
+            client_info = self.client_info_dict[client_id]
+            client_info.resources.append(ts)
+            self.l.info("Client rollover reporting - %s at %s" % (client_id, ts.isoformat()))
 
         return {}
 
-    def __getClientID(ip, procID):
+    def __get_client_id(self, client_host, chunk):
         """
         Converts an IP address/process ID combination into a single identifier.
-        :param ip: IP address of the client machine
-        :param procID: Process ID of the client
+        :param client_host: IP address of the client machine
+        :param chunk: Chunk-size of the client (unique)
         :return: See Description.
         """
-        return ip + ":" + procID
+        return client_host + ":" + str(chunk)
 
 
+# --MAIN----------------------------------------------------------------------------------------------------------------
 if __name__ == "__main__":
-    s = Server(3) #TODO
+    if sys.version_info.major != 2 and sys.version_info.minor != 7:
+        print "This version of Python (" + sys.version + ") is not supported! Please install 2.7."
+        sys.exit(1)
+
+    parser = ArgumentParser()
+    parser.add_argument("--benchmark_time",
+                        help="Time (seconds) the benchmark is run for on each client.",
+                        type=int,
+                        default=10)
+    parser.add_argument("--chunk_size",
+                        help="Size (MB) clients write to a file before flushing. Minimum of 10MB.",
+                        type=int,
+                        default=10)
+    parser.add_argument("--file_size",
+                        help="Size (MB) of files clients generate. Minimum of 10MB.",
+                        type=int,
+                        default=50)
+    parser.add_argument("--heartbeat_interval",
+                        help="Time (seconds) for clients to sleep between heartbeat notifications.",
+                        type=int,
+                        default=5)
+    parser.add_argument("--monitoring_interval",
+                        help="Time (seconds) for clients to sleep between resource monitoring notifications.",
+                        type=int,
+                        default=10)
+    parser.add_argument("--port",
+                        help="TCP port to run the server on.",
+                        type=int,
+                        default=8080)
+
+    args = parser.parse_args()
+    # TODO - muck with the args parser instead of this hackery
+    args.client_hostnames = [gethostname()]
+
+    sanity_check_config(args)
+    largest_chunk = args.chunk_size * (2 ** (len(args.client_hostnames) - 1))
+    if largest_chunk > args.file_size:
+        print "File size (%s) must be larger than %s. Bailing!" % (args.file_size, largest_chunk)
+        sys.exit(1)
+
+    s = Server(
+        args.client_hostnames,
+        args.benchmark_time,
+        args.chunk_size,
+        args.file_size,
+        args.heartbeat_interval,
+        args.monitoring_interval,
+        args.port
+    )
 
     # Initialize routes
-    bottle.post("/")(s.hello)
+    bottle.get("/hello")(s.hello)
+
+    bottle.get("/")(s.main)
+    bottle.post("/hello")(s.hello)
     bottle.post(HEARTBEAT_PATH)(s.client_heartbeat)
     bottle.post(START_PATH)(s.client_start)
     bottle.post(STOP_PATH)(s.client_stop)
     bottle.post(RESOURCES_PATH)(s.client_resources)
     bottle.post(ROLLOVER_PATH)(s.client_rollover)
 
-
-    bottle.run(host='localhost', port=8080, debug=True)
+    s.run_benchmarks()
+    bottle.run(host='localhost', port=args.port, debug=True)

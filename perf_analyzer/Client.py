@@ -1,3 +1,12 @@
+# ----------------------------------------------------------------------------------------------------------------------
+# Copyright (C) 2015 David Fugate dave.fugate@gmail.com
+#
+# This work is licensed under the Creative Commons
+# Attribution-NonCommercial-NoDerivs 3.0 Unported License. To view a copy of
+# this license, visit http://creativecommons.org/licenses/by-nc-nd/3.0/ or send
+# a letter to Creative Commons, PO Box 1866, Mountain View, CA 94042, USA.
+# ----------------------------------------------------------------------------------------------------------------------
+
 import sys
 import threading
 import tempfile
@@ -9,8 +18,8 @@ import logging.handlers
 
 from argparse import ArgumentParser
 from datetime import datetime, timedelta
-from socket import gethostname
-from os import getpid, sep
+from socket import gethostname, gethostbyname
+from os import sep
 from time import sleep
 
 try:
@@ -20,10 +29,10 @@ except ImportError, e:
     print "Please run 'pip install psutil' and try starting the server again."
     sys.exit(1)
 
-from Common import *
+from perf_analyzer import *
 
-# -- Helper Functions ---------------------------------------------------------
 
+# -- HELPERS -----------------------------------------------------------------------------------------------------------
 
 def get_timestamp(dt=None):
     """
@@ -33,60 +42,71 @@ def get_timestamp(dt=None):
     :return: See Description.
     """
     if dt is None:
-        return str(datetime.utcnow())
+        return datetime.utcnow().strftime(DATETIME_FORMAT)
     else:
-        return str(dt)
+        return dt.strftime(DATETIME_FORMAT)
 
 
 def inform_server(partial_url, data):
     """
     Used to log messages to the server.
-    :param url: Partial URL path
+    :param partial_url: Partial URL path
     :param data: Data to log (a dictionary)
-    :return: Nothing.
+    :return: Server response.
     """
+    # Data common to all requests we send up to the server.
     data[HOSTNAME] = hostname
-    data[PID] = pid
+    data[CHUNK] = args.chunk_size
+
+    # Most invocations of this method will not include the timestamp
     if not (TIMESTAMP in data):
         data[TIMESTAMP] = get_timestamp()
 
-    req = urllib2.Request(args.server + partial_url)
+    req = urllib2.Request("http://" + args.server + ":" + args.server_port + partial_url)
     req.add_header('Content-Type', 'application/json')
+    # TODO Error-checking. What happens if the server disappears?
     resp = urllib2.urlopen(req, json.dumps(data))
 
-    return
+    return resp
 
-def do_work(temp_dir):
+
+def do_work(work_dir, chunk_size, file_size, benchmark_duration):
     """
     Does the actual work required for this benchmarking suite.
+    :param work_dir Directory to do write files within.
+    :param chunk_size Number of bytes to write to disk before flushing.
+    :param file_size Size of the file (bytes) to write.
+    :param benchmark_duration Time (seconds) to run the benchmark before terminating.
     :return: A temporary directory which needs to be deleted.
     """
     global running
 
-    file_unique_id = 0
-    chunk_str = "a" * (1000000 * args.chunk)
-    final_chunk_str = "a" * (1000000 * (args.file_size % args.chunk))
+    try:
+        file_unique_id = 0
+        # Data blob we'll flush to disk with every write.
+        chunk_str = "a" * (1000000 * chunk_size)
+        # The last piece of data written *can* be a different size
+        final_chunk_str = "a" * (1000000 * (file_size % chunk_size))
+        # Time the benchmark must stop by.
+        final_time = start_time + timedelta(0, benchmark_duration)
 
-    final_time = start_time + timedelta(0, args.time)
-
-    while datetime.utcnow() < final_time:
-        file_unique_id += 1
-        with open(temp_dir + sep + str(file_unique_id), 'w') as f:
-            for i in xrange(0, args.file_size / args.chunk):
-                f.write(chunk_str)
-                f.flush()
-            if final_chunk_str != "":
-                f.write(final_chunk_str)
-                f.flush()
+        # We stop the benchmark *only* after complete files have been written to disk; not simply chunks
+        while datetime.utcnow() < final_time:
+            file_unique_id += 1
+            with open(work_dir + sep + str(file_unique_id), 'w') as f:
+                for i in xrange(0, file_size / chunk_size):
+                    f.write(chunk_str)
+                    f.flush()
+                if final_chunk_str != "":
+                    f.write(final_chunk_str)
+                    f.flush()
                 
-        l.info('Rollover (%d)' % file_unique_id)
-        inform_server(ROLLOVER_PATH,
-                      {
-                        CHUNK: args.chunk,
-                        FILE_SIZE: args.file_size,
-                      })
+            l.info('Rollover (%d)' % file_unique_id)
+            inform_server(ROLLOVER_PATH, {})
 
-    running = False
+    finally:
+        running = False
+
     return
 
 
@@ -98,17 +118,18 @@ def heartbeat():
     while running:
         l.debug('Heartbeat')
         inform_server(HEARTBEAT_PATH, {})
-        sleep(args.heartbeat)
+        sleep(args.heartbeat_interval)
     return
 
 
-def monitor_resources():
+def monitor_resources(sleep_time):
     """
     Monitors system resources while the benchmark is running.
+    :param sleep_time Time to sleep between resource checks.
     :return: Nothing
     """
     while running:
-        cpu_percent = psutil.cpu_percent(args.monitoring)
+        cpu_percent = psutil.cpu_percent(sleep_time)  # sleeps for args.monitoring_interval seconds
         swap_memory = psutil.swap_memory()
         inform_server(RESOURCES_PATH,
                       {
@@ -118,77 +139,54 @@ def monitor_resources():
     return
 
 
+# --MAIN----------------------------------------------------------------------------------------------------------------
+
 if __name__ == "__main__":
-
-    if sys.version_info.major != 2 and sys.version_info.minor != 7:
-        print "This version of Python (" + sys.version + ") is not supported! Please install 2.7."
-        sys.exit(1)
-
     parser = ArgumentParser()
     parser.add_argument("server",
-                        help="URL of the 'HD Performance Analyzer' server",
-                        type=str,
-                        default="http://localhost:8080")
-    parser.add_argument("time",
-                        help="Amount of time (seconds) to run this benchmark before terminating.",
-                        type=int,
-                        default=10)
-    parser.add_argument("chunk",
-                        help="Size of data chunks in MB. Minimum of 10",
-                        type=int,
-                        default=10)
+                        help="IP address of the server.",
+                        type=str)
+    parser.add_argument("server_port",
+                        help="TCP port on the server accepting HTTP requests.",
+                        type=str)
+    parser.add_argument("benchmark_time",
+                        help="Time (seconds) the benchmark is run for.",
+                        type=int)
+    parser.add_argument("chunk_size",
+                        help="Size (MB) to buffer before flushing to a file. Minimum of 10MB.",
+                        type=int)
     parser.add_argument("file_size",
-                        help="Size of files in MB. Minimum of 10",
-                        type=int,
-                        default=50)
-    parser.add_argument("heartbeat",
-                        help="Amount of time (seconds) to sleep between heartbeat notifications.",
-                        type=int,
-                        default=5)
-    parser.add_argument("monitoring",
-                        help="Amount of time (seconds) to sleep between resource monitoring notifications.",
-                        type=int,
-                        default=10)
+                        help="Size (MB) of files to generate. Minimum of 10MB.",
+                        type=int)
+    parser.add_argument("heartbeat_interval",
+                        help="Time (seconds) for to sleep between heartbeat notifications.",
+                        type=int)
+    parser.add_argument("monitoring_interval",
+                        help="Time (seconds) to sleep between resource monitoring notifications.",
+                        type=int)
+
     args = parser.parse_args()
-
     hostname = gethostname()
-    pid = getpid()
+    # If the server is run locally as well...let's assume they haven't setup the network properly
+    if gethostbyname(hostname) == args.server:
+        args.server = "localhost"
 
-    # -- Sanity Checks --------------------------------------------------------
-    try:
-        inform_server("/", {})
-    except:
-        print "Unable to contact server. Bailing!"
+    # --SANITY CHECKS---------------------------------------------------------------------------------------------------
+    #try:
+    inform_server("/hello", {})
+    #except:
+    #    print "Unable to contact server (%s). Bailing!" % ("http://" + args.server + ":" + args.server_port + "/hello")
+    #    sys.exit(1)
+
+    sanity_check_config(args)
+    if args.chunk_size > args.file_size:
+        print "File size must be larger than chunk_size size. Bailing!"
         sys.exit(1)
 
-    if args.time < 1:
-        print "'%s' seconds is insufficient time to run this benchmark. Bailing!" % args.time
-        sys.exit(1)
-    elif args.chunk < 10:
-        print "'%s' MB is too small of a chunk size for this benchmark. Bailing!" % args.chunk
-        sys.exit(1)
-    elif args.file_size < 10:
-        print "'%s' MB is too small of a file size for this benchmark. Bailing!" % args.file_size
-        sys.exit(1)
-    elif args.chunk > args.file_size:
-        print "File size must be larger than chunk size. Bailing!"
-        sys.exit(1)
-    elif args.heartbeat < 1:
-        print "'%s' seconds is too small of a heartbeat interval. Bailing!" % args.heartbeat
-        sys.exit(1)
-    elif args.monitoring < 1:
-        print "'%s' seconds is too small of a resource monitoring interval. Bailing!" % args.monitoring
-        sys.exit(1)
-    elif args.heartbeat > args.time:
-        print "The heartbeat interval (%s) must be larger than the time to run this benchmark. Bailing!" % (args.heartbeat, args.time)
-        sys.exit(1)
-    elif args.monitoring > args.time:
-        print "The resource monitoring interval (%s) must be larger than the time to run this benchmark. Bailing!" % (args.monitoring, args.time)
-        sys.exit(1)
     # TODO Determine if we can go through at least two rollovers in the time given
 
     # -- The Good Stuff -------------------------------------------------------
-    l = logging.getLogger('perf_analyzer')
+    l = logging.getLogger('client-' + str(args.chunk_size))
     lh = logging.StreamHandler(sys.stdout)
     lf = logging.Formatter(LOG_FORMAT)
     lh.setFormatter(lf)
@@ -198,9 +196,9 @@ if __name__ == "__main__":
     temp_dir = tempfile.mkdtemp()  # TODO any way to tell if this is locally mounted?
     l.debug('Files generated by this test will be stored in "%s".' % temp_dir)
 
-    monitor_resources_thread = threading.Thread(target=monitor_resources, args=())
+    monitor_resources_thread = threading.Thread(target=monitor_resources, args=(args.monitoring_interval,))
     heartbeat_thread = threading.Thread(target=heartbeat, args=())
-    do_work_thread = threading.Thread(target=do_work, args=(temp_dir,))
+    do_work_thread = threading.Thread(target=do_work, args=(temp_dir, args.chunk_size, args.file_size, args.benchmark_time))
 
     start_time = datetime.utcnow()
     l.info('Started at "%s".' % str(start_time))
