@@ -225,6 +225,14 @@ class Server(object):
 
         return {}
 
+    def static(self, file_path):
+        """
+        Used to serve up CSS/JS/etc. files.
+        :param file_path: Server path to static files.
+        :return: Static file.
+        """
+        return bottle.static_file(file_path, root='static')
+
     def __get_client_id(self, client_host, chunk):
         """
         Converts an IP address/process ID combination into a single identifier.
@@ -237,9 +245,6 @@ class Server(object):
 
 # --MAIN----------------------------------------------------------------------------------------------------------------
 if __name__ == "__main__":
-    if sys.version_info.major != 2 and sys.version_info.minor != 7:
-        print "This version of Python (" + sys.version + ") is not supported! Please install 2.7."
-        sys.exit(1)
 
     parser = ArgumentParser()
     parser.add_argument("--benchmark_time",
@@ -288,9 +293,9 @@ if __name__ == "__main__":
     )
 
     # Initialize routes
-    bottle.get("/hello")(s.hello)
-
     bottle.get("/")(s.main)
+    bottle.route('/static/:file_path#.+#')(s.static)
+
     bottle.post("/hello")(s.hello)
     bottle.post(HEARTBEAT_PATH)(s.client_heartbeat)
     bottle.post(START_PATH)(s.client_start)
