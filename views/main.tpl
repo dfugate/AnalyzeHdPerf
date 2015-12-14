@@ -1,4 +1,4 @@
-% include('header.tpl', title='SSD Performance Analyzer')
+% include('header.tpl', title='HDPA - Home')
 
 <p class="bg-primary">
     Not much to see yet!

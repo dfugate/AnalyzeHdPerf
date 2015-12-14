@@ -14,6 +14,7 @@ from socket import gethostname
 from argparse import ArgumentParser
 from datetime import datetime
 from time import sleep
+from threading import Thread
 
 from perf_analyzer import *
 from perf_analyzer.ClientInfo import ClientInfo
@@ -59,7 +60,7 @@ class Server(object):
         self.benchmark_time = benchmark_time
         self.chunk_size = chunk_size
         self.file_size = file_size
-        self.heartbeat_duration = heartbeat_interval
+        self.heartbeat_interval = heartbeat_interval
         self.monitoring_interval = monitoring_interval
         self.port = port
 
@@ -87,12 +88,13 @@ class Server(object):
             # Each client gets a different chunk_size-size.
             client_chunk_size = self.chunk_size * (2 ** i)
             client_id = self.__get_client_id(client_host, client_chunk_size)
-            self.client_info_dict[client_id] = ClientInfo(client_host,
+            self.client_info_dict[client_id] = ClientInfo(self.l,
+                                                          client_host,
                                                           self.port,
                                                           self.benchmark_time,
                                                           client_chunk_size,
                                                           self.file_size,
-                                                          self.heartbeat_duration,
+                                                          self.heartbeat_interval,
                                                           self.monitoring_interval)
             i += 1
 
@@ -102,7 +104,8 @@ class Server(object):
         for ci in self.client_info_dict.values():
             ci.run()
 
-        # TODO - kickoff monitoring thread.
+        self.client_thread = Thread(target=self.__monitor_clients, args=())
+        self.client_thread.start()
 
     def main(self):
         """
@@ -110,6 +113,17 @@ class Server(object):
         :return:
         """
         return bottle.template('main')
+
+    def status(self):
+        """
+        Real-time status of benchmark testing.
+        :return:
+        """
+        finished = [x for x in self.client_info_dict.values() if x.done and not (x.stopped is None)]
+        failed = [x for x in self.client_info_dict.values() if x.done and (x.stopped is None)]
+        running = [x for x in self.client_info_dict.values() if not x.done]
+
+        return bottle.template('status', server=self, finished=finished, failed=failed, running=running)
 
     def hello(self):
         """
@@ -120,7 +134,7 @@ class Server(object):
 
     def client_heartbeat(self):
         """
-        Client heartbeat_duration.
+        Client heartbeat_interval.
         :return: Nothing.
         """
         client_host = bottle.request.json[HOSTNAME]
@@ -233,6 +247,29 @@ class Server(object):
         """
         return bottle.static_file(file_path, root='static')
 
+    def __monitor_clients(self):
+        """
+        Monitors the health of clients.
+        :return: None.
+        """
+        self.l.info("Monitoring the health of clients now.")
+
+        while self.stopped is None:
+            sleep(5)
+
+            clients = [x for x in self.client_info_dict.values() if not x.done]
+            still_running = False
+
+            for ci in clients:
+                if not ci.check_status():
+                    still_running = True
+
+            if not still_running:
+                self.stopped = datetime.utcnow()
+
+        self.l.info("All clients finished running the benchmark.")
+        return
+
     def __get_client_id(self, client_host, chunk):
         """
         Converts an IP address/process ID combination into a single identifier.
@@ -294,6 +331,7 @@ if __name__ == "__main__":
 
     # Initialize routes
     bottle.get("/")(s.main)
+    bottle.get("/status")(s.status)
     bottle.route('/static/:file_path#.+#')(s.static)
 
     bottle.post("/hello")(s.hello)
@@ -305,3 +343,4 @@ if __name__ == "__main__":
 
     s.run_benchmarks()
     bottle.run(host='localhost', port=args.port, debug=True)
+    s.client_thread.join()

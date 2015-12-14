@@ -25,5 +25,20 @@
                                  class="img-circle" style="cursor: pointer;"/>
                         </a>
                     </div>
+
+                    <div class="collapse navbar-collapse">
+                        <ul class="nav navbar-nav">
+                            <li class="active"><p class="navbar-text">Hard Drive Performance Analyzer</p></li>
+                            <li><a href="/">Home</a></li>
+                            <li><a href="/status">Status</a></li>
+                            <li><a href="/report">Report</a></li>
+
+                        </ul>
+                        <ul class="nav navbar-nav navbar-right">
+                            <li><a href="/about">About</a></li>
+                        </ul>
+                    </div>
+
+
                 </div>
             </nav>

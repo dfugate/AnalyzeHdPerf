@@ -11,9 +11,13 @@ from subprocess import Popen
 from os import getlogin
 from os import path
 from socket import gethostname, gethostbyname
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from perf_analyzer import *
+
+# --GLOBALS-------------------------------------------------------------------------------------------------------------
+MAX_MISSED_HEARTBEATS = 3
+
 
 # ----------------------------------------------------------------------------------------------------------------------
 
@@ -22,6 +26,7 @@ class ClientInfo(object):
     Responsible for holding benchmarking data on a single client.
     """
     def __init__(self,
+                 l,
                  hostname,
                  server_port,
                  benchmark_time,
@@ -31,6 +36,7 @@ class ClientInfo(object):
                  monitoring_interval):
         """
         Constructor
+        :param l: Logger instance
         :param hostname: PC to run the benchmark against. Should have SSH setup to login w/o a password.
         :param server_port: TCP port the server is hosting the REST services at.
         :param benchmark_time: Time (seconds) to run the benchmark for.
@@ -40,6 +46,8 @@ class ClientInfo(object):
         :param monitoring_interval: Time (seconds) clients should sleep before sending resource notifications.
         :return:
         """
+        self.l = l
+
         self.hostname = hostname
         self.server_port = server_port
         self.benchmark_time = benchmark_time
@@ -54,13 +62,47 @@ class ClientInfo(object):
         self.resources = []
         self.rollovers = []
 
+        self.kicked_off = None
         self.done = False
+
+    def check_status(self):
+        """
+        Used to check the status of the client.
+        :return: True if the client is done.
+        """
+
+        if self.done:
+            # Previous invocation has determined this client is done...great!
+            return True
+        elif not(self.stopped is None):
+            # Completed since the last check_status invocation...great!
+            self.done = True
+            return True
+        elif self.kicked_off is None:
+            # Hasn't even started yet...nothing else to do.
+            return False
+
+        # Find the last time we heard from the client...
+        last_communication = self.get_last_contact()
+
+        # Determine if the client is dead or not
+        presumed_dead_date = last_communication + timedelta(0, self.heartbeat_interval * MAX_MISSED_HEARTBEATS)
+        now = datetime.utcnow()
+        if now > presumed_dead_date:
+            self.l.error('Client on host "%s" (chunk size of "%s") is DEAD!' % (self.hostname,
+                                                                                str(self.chunk_size)))
+            self.done = True
+            return True
+
+        return False
 
     def run(self):
         """
         Asynchronously runs the benchmark on the remote client.
         :return:
         """
+        self.kicked_off = datetime.utcnow()
+
         pkg_path = path.abspath(path.dirname(path.realpath(__file__)))
         simple_dt_str = datetime.utcnow().strftime(DATETIME_FORMAT)
         tmp_dir_name = "/tmp/hdperf_" + str(self.chunk_size) + "_" + simple_dt_str
@@ -93,10 +135,23 @@ class ClientInfo(object):
              ])
         return
 
+    def get_last_contact(self):
+        """
+        Returns the last time we had any contact with the client.
+        :return: See description.
+        """
+        last_communication = self.kicked_off
+        if len(self.heartbeats) > 0:
+            last_communication = self.heartbeats[len(self.heartbeats) - 1]
+
+        return last_communication
+
 
 # --MAIN----------------------------------------------------------------------------------------------------------------
 if __name__ == "__main__":
-    ci = ClientInfo("localhost",
+    import logging
+    ci = ClientInfo(logging.getLogger("testClientInfo"),
+                    "localhost",
                     10,
                     10,
                     20,
