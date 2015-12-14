@@ -1,8 +1,6 @@
 % include('header.tpl', title='HDPA - Logs')
 % from operator import attrgetter
 
-
-
 <h1>
     Logs
 </h1>
