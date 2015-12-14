@@ -1,4 +1,5 @@
 % include('header.tpl', title='HDPA - Logs')
+% from operator import attrgetter
 
 
 
@@ -18,9 +19,18 @@
             </tr>
         </thead>
         <tbody>
-            % for log in log_buffer:
+            % for log in sorted(log_buffer, key=attrgetter('asctime'), reverse=True):
             <tr>
-                % severity = "info" # TODO - fix me
+                <%
+                 severity = "info"
+                 if log.levelname == "DEBUG":
+                     severity = "active"
+                 elif log.levelname == "ERROR" or log.levelname == "CRITICAL":
+                     severity = "danger"
+                 elif log.levelname == "WARN" or log.levelname == "WARNING":
+                     severity = "warning"
+                 end
+                %>
                 <td class="{{severity}}">{{log.levelname}}</td>
                 <td>{{log.asctime}}</td>
                 <td>{{log.message}}</td>

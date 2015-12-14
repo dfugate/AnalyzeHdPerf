@@ -79,7 +79,7 @@ class Server(object):
         self.l.setLevel(logging.DEBUG)
 
         self.pbh = PersistentBufferingHandler(1000)
-        self.pbh.setLevel(logging.INFO)
+        self.pbh.setLevel(logging.DEBUG)
         self.l.addHandler(self.pbh)
 
     def run_benchmarks(self):
