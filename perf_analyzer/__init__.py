@@ -8,6 +8,8 @@
 # ----------------------------------------------------------------------------------------------------------------------
 
 import sys
+import logging
+import logging.handlers
 
 # --SANITY CHECKS-------------------------------------------------------------------------------------------------------
 
@@ -72,3 +74,15 @@ def sanity_check_config(args):
     elif args.monitoring_interval > args.benchmark_time:
         print "Resource monitoring interval (%s) must be larger than the benchmark time (%s). Bailing!" % (args.monitoring_interval, args.benchmark_time)
         sys.exit(1)
+
+#-----------------------------------------------------------------------------------------------------------------------
+class PersistentBufferingHandler(logging.handlers.BufferingHandler):
+    """
+    Subclass of BufferingHandler which *never* throws lows away.
+    """
+    def flush(self):
+        """
+        Overridden
+        :return: Nothing
+        """
+        pass
