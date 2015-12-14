@@ -1,4 +1,4 @@
-% include('header.tpl', title='HDPA - Home')
+% include('header.tpl', title='HDPA - Report')
 
 <script src="/static/js/d3.min.js"></script>
 <script>
