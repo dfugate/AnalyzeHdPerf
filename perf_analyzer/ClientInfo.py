@@ -146,6 +146,45 @@ class ClientInfo(object):
 
         return last_communication
 
+    def __timestamp_helper(self, dt):
+        """
+        Helper method converts a datetime to a floating-point timestamp.
+        :param dt:
+        :return:
+        """
+        if dt is None:
+            return "null"
+        else:
+            return (dt - datetime(1970, 1, 1)).total_seconds()
+
+    def to_json(self):
+        """
+        Converts this object to a JSON representation suitable for JS consumption.
+        :return:
+        """
+        ret_val = "{"
+        ret_val += "'hostname':'" + self.hostname + "',"
+        ret_val += "'chunk_size':'" + str(self.chunk_size) + "',"
+        ret_val += "'started':" + str(self.__timestamp_helper(self.started)) + ","
+        ret_val += "'stopped':" + str(self.__timestamp_helper(self.stopped)) + ",\n"
+
+        ret_val += "'resources':["
+        for i in xrange(len(self.resources)):
+            resource = self.resources[i]
+            ret_val += "[" + str(self.__timestamp_helper(resource[0])) + "," + str(resource[1]) + "," + str(resource[2]) + "]"
+            if i != (len(self.resources)-1):
+                ret_val += ","
+
+        ret_val += "],\n'rollovers':["
+        for i in xrange(len(self.rollovers)):
+            ro = self.rollovers[i]
+            ret_val += str(self.__timestamp_helper(ro))
+            if i != (len(self.rollovers)-1):
+                ret_val += ","
+
+        ret_val += "]}\n"
+        return ret_val
+
 
 # --MAIN----------------------------------------------------------------------------------------------------------------
 if __name__ == "__main__":

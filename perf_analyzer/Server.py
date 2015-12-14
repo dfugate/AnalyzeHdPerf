@@ -125,6 +125,20 @@ class Server(object):
 
         return bottle.template('status', server=self, finished=finished, failed=failed, running=running)
 
+    def report(self):
+        """
+        Real-time reporting of benchmark testing.
+        :return:
+        """
+        return bottle.template('report', server=self)
+
+    def about(self):
+        """
+        About this benchmark suite.
+        :return:
+        """
+        return bottle.template('about', server=self)
+
     def hello(self):
         """
         Tells the client if the server is alive.
@@ -234,7 +248,7 @@ class Server(object):
             ts = datetime.strptime(ts_str, DATETIME_FORMAT)
 
             client_info = self.client_info_dict[client_id]
-            client_info.resources.append(ts)
+            client_info.rollovers.append(ts)
             self.l.info("Client rollover reporting - %s at %s" % (client_id, ts.isoformat()))
 
         return {}
@@ -332,6 +346,8 @@ if __name__ == "__main__":
     # Initialize routes
     bottle.get("/")(s.main)
     bottle.get("/status")(s.status)
+    bottle.get("/report")(s.report)
+    bottle.get("/about")(s.about)
     bottle.route('/static/:file_path#.+#')(s.static)
 
     bottle.post("/hello")(s.hello)

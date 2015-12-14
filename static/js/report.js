@@ -1,0 +1,2 @@
+//TODO - see http://stackoverflow.com/questions/21639305/d3js-take-data-from-an-array-instead-of-a-file
+//       and http://projects.flowingdata.com/life-expectancy/. Maybe http://bl.ocks.org/d3noob/b3ff6ae1c120eea654b5 too.
