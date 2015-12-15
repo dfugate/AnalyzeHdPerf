@@ -24,8 +24,6 @@
         <li>TODO</li>
     </ul>
 
-
-
 </div>
 
 % include('footer.tpl')

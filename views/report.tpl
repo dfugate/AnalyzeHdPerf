@@ -16,10 +16,23 @@
 </h1>
 <hr />
 
-<p class="bg-primary">
-    Not much to see yet!
-</p>
+% if server.stopped is not None:
+%   include('stats.tpl', server=server)
+%   include('config.tpl', server=server)
+% else:
+    <div class="row">
+        <div class="col-md-offset-3 col-md-6">
+        <img src="/static/img/coming-soon.jpg"
+             class="img-responsive"></img>
+        </div>
+    </div>
+    <br /><br />
+    <div class="well">
+        The run you started at {{server.started.isoformat()}} has not yet completed. Please wait a bit and reload this
+        page <b>or</b> you can also get the real-time status of this run <a href="/status">here</a>. Thanks for your
+        patience.
+    </div>
+% end
 
-% include('config.tpl', server=server)
 
 % include('footer.tpl')

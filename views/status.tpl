@@ -10,7 +10,7 @@
     <table class="table table-bordered">
         <thead>
             <tr>
-                <th>Client Host</th>
+                <th>Host</th>
                 <th>Chunk Size</th>
                 <th>Last Checked</th>
                 <th>Status</th>

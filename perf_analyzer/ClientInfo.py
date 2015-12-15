@@ -15,6 +15,8 @@ from datetime import datetime, timedelta
 
 from perf_analyzer import *
 
+from statistics import mean, median, stdev, variance
+
 # --GLOBALS-------------------------------------------------------------------------------------------------------------
 MAX_MISSED_HEARTBEATS = 3
 
@@ -156,6 +158,88 @@ class ClientInfo(object):
             return "null"
         else:
             return (dt - datetime(1970, 1, 1)).total_seconds()
+
+    def get_statistics(self):
+        """
+        Returns various statistics about the benchmark run.
+        :return: See description.
+        """
+        ret_val = {}
+        not_applicable = 'N/A'
+
+        if len(self.rollovers) > 1: # Skip the last rollover...it could've been smaller than chunk_size
+            rollover_times = []
+            last_time = self.started
+            for i in xrange(len(self.rollovers)-1):
+                rollover_times.append(
+                    (self.rollovers[i] - last_time).total_seconds()
+                )
+                last_time = self.rollovers[i]
+
+            ret_val['rollover_mean'] = self.num_to_seconds(mean(rollover_times))
+            ret_val['rollover_median'] = self.num_to_seconds(median(rollover_times))
+            ret_val['rollover_stdev'] = self.num_to_seconds(stdev(rollover_times))
+            ret_val['rollover_variance'] = self.num_to_seconds(variance(rollover_times))
+        else:
+            ret_val['rollover_mean'] = not_applicable
+            ret_val['rollover_median'] = not_applicable
+            ret_val['rollover_stdev'] = not_applicable
+            ret_val['rollover_variance'] = not_applicable
+
+        if len(self.resources) > 0:
+            cpu_util_list = [x[1] for x in self.resources]
+            ret_val['cpu_util_mean'] = self.num_to_percent(mean(cpu_util_list))
+            ret_val['cpu_util_median'] = self.num_to_percent(median(cpu_util_list))
+            ret_val['cpu_util_stdev'] = self.num_to_percent(stdev(cpu_util_list))
+            if len(cpu_util_list) > 1:
+                ret_val['cpu_util_variance'] = self.num_to_percent(variance(cpu_util_list))
+            else:
+                ret_val['cpu_util_variance'] = not_applicable
+
+            mem_usage_list = [x[2] for x in self.resources]
+            ret_val['mem_usage_mean'] = self.num_to_megabytes(mean(mem_usage_list))
+            ret_val['mem_usage_median'] = self.num_to_megabytes(median(mem_usage_list))
+            ret_val['mem_usage_stdev'] = self.num_to_megabytes(stdev(mem_usage_list))
+            if len(mem_usage_list) > 1:
+                ret_val['mem_usage_variance'] = self.num_to_megabytes(variance(mem_usage_list))
+            else:
+                ret_val['mem_usage_variance'] = not_applicable
+        else:
+            ret_val['cpu_util_mean'] = not_applicable
+            ret_val['cpu_util_median'] = not_applicable
+            ret_val['cpu_util_stdev'] = not_applicable
+            ret_val['cpu_util_variance'] = not_applicable
+            
+            ret_val['mem_usage_mean'] = not_applicable
+            ret_val['mem_usage_median'] = not_applicable
+            ret_val['mem_usage_stdev'] = not_applicable
+            ret_val['mem_usage_variance'] = not_applicable
+
+        return ret_val
+
+    def num_to_percent(self, num):
+        """
+        Converts a number (integer, float, long) to a user-friendly percentage representation.
+        :param num: Number to convert.
+        :return: See description.
+        """
+        return '{:5.2f}%'.format(num)
+
+    def num_to_seconds(self, num):
+        """
+        Converts a number (integer, float, long) to a user-friendly time representation (seconds).
+        :param num: Number to convert.
+        :return: See description.
+        """
+        return '{:.2f} s'.format(num)
+
+    def num_to_megabytes(self, num):
+        """
+        Converts a number (integer, float, long) to a user-friendly MB representation (seconds).
+        :param num: Number to convert.
+        :return: See description.
+        """
+        return '{:.2f} MB'.format(num)
 
     def to_json(self):
         """
