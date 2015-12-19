@@ -8,8 +8,7 @@
 # ----------------------------------------------------------------------------------------------------------------------
 
 from subprocess import Popen
-from os import getlogin
-from os import path
+from os import getlogin, path, devnull
 from socket import gethostname, gethostbyname
 from datetime import datetime, timedelta
 
@@ -19,7 +18,7 @@ from statistics import mean, median, stdev, variance
 
 # --GLOBALS-------------------------------------------------------------------------------------------------------------
 MAX_MISSED_HEARTBEATS = 3
-
+DEVNULL = open(devnull, 'w')
 
 # ----------------------------------------------------------------------------------------------------------------------
 
@@ -118,6 +117,9 @@ class ClientInfo(object):
         # We need the PWD as part of the Python path. Don't care if we blow-away the existing path (not used)
         cmd_line += "PYTHONPATH=.;export PYTHONPATH; "
 
+        # Give web server a chance to fire-up (just in case).
+        cmd_line += "sleep 5; "
+
         # Now construct the args to the client
         cmd_line += "python perf_analyzer/Client.py %s %s %s %s %s %s %s" % (gethostbyname(gethostname()),
                                                                              self.server_port,
@@ -134,7 +136,10 @@ class ClientInfo(object):
              "-q",
              "%s@%s" % (getlogin(), self.hostname),
              cmd_line
-             ])
+             ],
+            stdout=DEVNULL,
+            stderr=DEVNULL,
+        )
         return
 
     def get_last_contact(self):

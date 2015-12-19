@@ -15,6 +15,7 @@ from argparse import ArgumentParser
 from datetime import datetime
 from time import sleep
 from threading import Thread
+from os import getcwd, sep
 
 from perf_analyzer import *
 from perf_analyzer.ClientInfo import ClientInfo
@@ -43,7 +44,8 @@ class Server(object):
                  file_size,
                  heartbeat_interval,
                  monitoring_interval,
-                 port
+                 port,
+                 log_file
                  ):
         """
         Constructor
@@ -54,6 +56,7 @@ class Server(object):
         :param heartbeat_interval: Time (seconds) a client is to wait before periodically contacting the server.
         :param monitoring_interval: Time (seconds) a client waits before periodically sending the server perf. data.
         :param port: TCP port number to run the HTTP server on.
+        :param log_file: file to dump logs into.
         :return: Instance of this class.
         """
         self.client_hostnames = client_hostnames
@@ -72,12 +75,20 @@ class Server(object):
         self.stopped = None
 
         self.l = logging.getLogger('server')
+        self.l.setLevel(logging.DEBUG)
+
+        # Stdout logger
         lh = logging.StreamHandler(sys.stdout)
         lf = logging.Formatter(LOG_FORMAT)
         lh.setFormatter(lf)
         self.l.addHandler(lh)
-        self.l.setLevel(logging.DEBUG)
 
+        # File logger
+        self.fh = logging.FileHandler(log_file, mode='w')
+        self.fh.setLevel(logging.INFO)
+        self.l.addHandler(self.fh)
+
+        # We need an in-memory logging handler to render the logs on an HTML page (easily at least).
         self.pbh = PersistentBufferingHandler(1000)
         self.pbh.setLevel(logging.DEBUG)
         self.l.addHandler(self.pbh)
@@ -102,7 +113,6 @@ class Server(object):
                                                           self.monitoring_interval)
             i += 1
 
-        sleep(10)  # Give the system some time to become stable
         self.l.debug("Starting benchmarks now...")
         self.started = datetime.utcnow()
         for ci in self.client_info_dict.values():
@@ -111,6 +121,7 @@ class Server(object):
         self.client_thread = Thread(target=self.__monitor_clients, args=())
         self.client_thread.start()
 
+    # --HTML VIEWS------------------------------------------------------------------------------------------------------
     def main(self):
         """
         Main HTML page for the benchmark suite.
@@ -272,6 +283,7 @@ class Server(object):
         """
         return bottle.static_file(file_path, root='static')
 
+    # --"PRIVATE"-------------------------------------------------------------------------------------------------------
     def __monitor_clients(self):
         """
         Monitors the health of clients.
@@ -307,6 +319,9 @@ class Server(object):
 
 # --MAIN----------------------------------------------------------------------------------------------------------------
 if __name__ == "__main__":
+    now = datetime.utcnow()
+    now_str = now.strftime(DATETIME_FORMAT)
+    cwd = getcwd()
 
     parser = ArgumentParser()
     parser.add_argument("--benchmark_time",
@@ -334,9 +349,24 @@ if __name__ == "__main__":
                         type=int,
                         default=8080)
 
+    parser.add_argument("--client",
+                        help="Hostname of client to run the benchmark on. Same client can be specified multiple times.",
+                        action="append")
+
+    parser.add_argument("--log",
+                        help="Text log file for this run.",
+                        type=str,
+                        default=cwd + sep + "hd_perf_analyzer_" + now_str + ".log")
+
     args = parser.parse_args()
-    # TODO - muck with the args parser instead of this hackery
-    args.client_hostnames = [gethostname()]
+
+    if args.client is None:
+        # No clients were specified...just run it three times locally with different chunk sizes.
+        print "No clients were specified. Will run three locally."
+        print ""
+        args.client_hostnames = [gethostname()] * 3
+    else:
+        args.client_hostnames = args.client
 
     sanity_check_config(args)
     largest_chunk = args.chunk_size * (2 ** (len(args.client_hostnames) - 1))
@@ -344,6 +374,12 @@ if __name__ == "__main__":
         print "File size (%s) must be larger than %s. Bailing!" % (args.file_size, largest_chunk)
         sys.exit(1)
 
+    print "Server logs will be saved to '%s'." % args.log
+    print "A much nicer view of these logs can be accessed at 'http://localhost:%s/logs' though." % args.port
+    print ""
+    print "The real-time status of this benchmark can be viewed at 'http://localhost:%s/status' and" % args.port
+    print "The final report, once complete, can be found at 'http://localhost:%s/report'." % args.port
+    print "------------------------------------------------------------------------------------------------------------"
     s = Server(
         args.client_hostnames,
         args.benchmark_time,
@@ -351,7 +387,8 @@ if __name__ == "__main__":
         args.file_size,
         args.heartbeat_interval,
         args.monitoring_interval,
-        args.port
+        args.port,
+        args.log
     )
 
     # Initialize routes
@@ -370,5 +407,5 @@ if __name__ == "__main__":
     bottle.post(ROLLOVER_PATH)(s.client_rollover)
 
     s.run_benchmarks()
-    bottle.run(host='localhost', port=args.port, debug=True)
+    bottle.run(host='localhost', port=args.port, debug=True, quiet=True)
     s.client_thread.join()
