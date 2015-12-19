@@ -29,13 +29,28 @@
                     <div class="collapse navbar-collapse">
                         <ul class="nav navbar-nav">
                             <li class="active"><p class="navbar-text">Hard Drive Performance Analyzer</p></li>
-                            <li><a href="/">Home</a></li>
-                            <li><a href="/status">Status</a></li>
-                            <li><a href="/report">Report</a></li>
-                            <li><a href="/logs">Logs</a></li>
+                            <li><a href="/">
+                                    <span class="glyphicon glyphicon-home" aria-hidden="true"> Home</span>
+                                </a>
+                            </li>
+                            <li><a href="/status">
+                                    <span class="glyphicon glyphicon-dashboard" aria-hidden="true"> Status</span>
+                                </a>
+                            </li>
+                            <li><a href="/report">
+                                    <span class="glyphicon glyphicon-stats" aria-hidden="true"> Report</span>
+                                </a>
+                            </li>
+                            <li><a href="/logs">
+                                    <span class="glyphicon glyphicon-list" aria-hidden="true"> Logs</span>
+                                </a>
+                            </li>
                         </ul>
                         <ul class="nav navbar-nav navbar-right">
-                            <li><a href="/about">About</a></li>
+                            <li><a href="/about">
+                                <span class="glyphicon glyphicon-user" aria-hidden="true"> About</span>
+                                </a>
+                            </li>
                         </ul>
                     </div>
 
