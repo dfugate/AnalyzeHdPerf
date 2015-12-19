@@ -76,22 +76,28 @@ class Server(object):
 
         self.l = logging.getLogger('server')
         self.l.setLevel(logging.DEBUG)
+        lf = logging.Formatter(LOG_FORMAT)
 
         # Stdout logger
-        lh = logging.StreamHandler(sys.stdout)
-        lf = logging.Formatter(LOG_FORMAT)
-        lh.setFormatter(lf)
-        self.l.addHandler(lh)
+        self.lh = logging.StreamHandler(sys.stdout)
+        self.lh.setFormatter(lf)
+        self.l.addHandler(self.lh)
 
         # File logger
         self.fh = logging.FileHandler(log_file, mode='w')
         self.fh.setLevel(logging.INFO)
+        self.fh.setFormatter(lf)
         self.l.addHandler(self.fh)
 
         # We need an in-memory logging handler to render the logs on an HTML page (easily at least).
         self.pbh = PersistentBufferingHandler(1000)
         self.pbh.setLevel(logging.DEBUG)
         self.l.addHandler(self.pbh)
+
+        self.l.info("Clients will run for '%s' seconds and then terminate." % self.benchmark_time)
+        self.l.info("Clients will create files containing '%s' MB of data before 'rolling over'." % self.file_size)
+        self.l.info("Clients will report back performance data to this server every '%s' seconds." % self.monitoring_interval)
+        self.l.info("Clients are to contact this server every '%s' seconds to signal they're still working." % self.heartbeat_interval)
 
     def run_benchmarks(self):
         """
@@ -113,7 +119,7 @@ class Server(object):
                                                           self.monitoring_interval)
             i += 1
 
-        self.l.debug("Starting benchmarks now...")
+        self.l.debug("Spawning benchmark processes now...")
         self.started = datetime.utcnow()
         for ci in self.client_info_dict.values():
             ci.run()
@@ -324,10 +330,13 @@ if __name__ == "__main__":
     cwd = getcwd()
 
     parser = ArgumentParser()
+    parser.add_argument("--client",
+                        help="Hostname of client to run the benchmark on. Same client can be specified multiple times.",
+                        action="append")
     parser.add_argument("--benchmark_time",
                         help="Time (seconds) the benchmark is run for on each client.",
                         type=int,
-                        default=10)
+                        default=20)
     parser.add_argument("--chunk_size",
                         help="Size (MB) clients write to a file before flushing. Minimum of 10MB.",
                         type=int,
@@ -348,11 +357,6 @@ if __name__ == "__main__":
                         help="TCP port to run the server on.",
                         type=int,
                         default=8080)
-
-    parser.add_argument("--client",
-                        help="Hostname of client to run the benchmark on. Same client can be specified multiple times.",
-                        action="append")
-
     parser.add_argument("--log",
                         help="Text log file for this run.",
                         type=str,
@@ -362,7 +366,7 @@ if __name__ == "__main__":
 
     if args.client is None:
         # No clients were specified...just run it three times locally with different chunk sizes.
-        print "No clients were specified. Will run three locally."
+        print "No clients were specified from the command prompt. Will run three locally."
         print ""
         args.client_hostnames = [gethostname()] * 3
     else:

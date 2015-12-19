@@ -8,7 +8,7 @@
 # ----------------------------------------------------------------------------------------------------------------------
 
 from subprocess import Popen
-from os import getlogin, path, devnull
+from os import getlogin, path, devnull, sep
 from socket import gethostname, gethostbyname
 from datetime import datetime, timedelta
 
@@ -130,6 +130,9 @@ class ClientInfo(object):
                                                                              self.monitoring_interval)
 
         # Run the thing in such a way that it returns control immediately.
+        self.l.info("Client '%s' is testing a chunk size of '%s' MB. It's logs can be found at '%s'." % (self.hostname,
+                                                                                                         self.chunk_size,
+                                                                                                         tmp_dir_name + sep + "run.log"))
         pipe = Popen(
             ["ssh",
              "-oStrictHostKeyChecking=no",
