@@ -256,7 +256,10 @@ class Server(object):
             client_info.resources.append(
                 [ts, cpu_util, mem_usage]
             )
-            self.l.info("Client resource reporting - %s at %s" % (client_id, ts.isoformat()))
+            self.l.info("Client resources - %s at %s - CPU=%s and MEMORY=%s" % (client_id,
+                                                                                ts.isoformat(),
+                                                                                cpu_util,
+                                                                                mem_usage))
 
         return {}
 
@@ -288,6 +291,12 @@ class Server(object):
         :return: Static file.
         """
         return bottle.static_file(file_path, root='static')
+
+    def get_favicon(self):
+        """
+        :return: Favicon file.
+        """
+        return bottle.static_file('favicon.ico', root='static')
 
     # --"PRIVATE"-------------------------------------------------------------------------------------------------------
     def __monitor_clients(self):
@@ -402,6 +411,7 @@ if __name__ == "__main__":
     bottle.get("/logs")(s.logs)
     bottle.get("/about")(s.about)
     bottle.route('/static/:file_path#.+#')(s.static)
+    bottle.get("/favicon.ico")(s.get_favicon)
 
     bottle.post("/hello")(s.hello)
     bottle.post(HEARTBEAT_PATH)(s.client_heartbeat)
