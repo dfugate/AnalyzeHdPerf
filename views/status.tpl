@@ -5,6 +5,25 @@
 </h1>
 <hr />
 
+% benchmarks_done = len(finished) + len(failed)
+% percent_complete = int(float(benchmarks_done) / float(benchmarks_done + len(running)) * 100)
+% if len(failed) > 0:
+%   progress_state = "progress-bar-danger"
+% elif percent_complete != 100:
+%   progress_state = "progress-bar-info"
+% else:
+%   progress_state = "progress-bar-success"
+% end
+
+<h4>Overall Progress</h4>
+<div class="progress">
+  <div class="progress-bar {{progress_state}}" role="progressbar"
+       aria-valuenow="{{percent_complete}}" aria-valuemin="0" aria-valuemax="100"
+       style="min-width: 2em; width: {{percent_complete}}%;">
+    {{percent_complete}}%
+  </div>
+</div>
+
 <div class="panel panel-primary">
     <div class="panel-heading">Client Status</div>
     <table class="table table-bordered">

@@ -13,10 +13,10 @@
         <script src="/static/js/jquery-2.1.4.min.js"></script>
         <script src="/static/js/bootstrap.min.js"></script>
     </head>
-    <body>
+    <body style="padding-top: 50px;">
         <div class="container">
-            <nav class="navbar navbar-inverse">
-                <div class="container-fluid">
+            <nav class="navbar navbar-inverse navbar-fixed-top">
+                <div class="container">
                     <div class="navbar-header">
                         <a class="navbar-brand" onclick="window.open('http://www.linkedin.com/in/davidfugate');return false;">
                             <img src="/static/img/me.jpg"

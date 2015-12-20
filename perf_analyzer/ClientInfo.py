@@ -14,7 +14,7 @@ from datetime import datetime, timedelta
 
 from perf_analyzer import *
 
-from statistics import mean, median, stdev, variance
+from statistics import mean, stdev, variance
 
 # --GLOBALS-------------------------------------------------------------------------------------------------------------
 MAX_MISSED_HEARTBEATS = 3
@@ -122,7 +122,7 @@ class ClientInfo(object):
         cmd_line += "sleep 5; "
 
         # Now construct the args to the client
-        cmd_line += "python perf_analyzer/Client.py %s %s %s %s %s %s %s" % (gethostbyname(gethostname()),
+        cmd_line += "python -m perf_analyzer.Client %s %s %s %s %s %s %s" % (gethostbyname(gethostname()),
                                                                              self.server_port,
                                                                              self.benchmark_time,
                                                                              self.chunk_size,
