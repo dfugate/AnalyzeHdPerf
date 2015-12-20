@@ -5,17 +5,16 @@
     <table class="table table-bordered">
         <thead>
             <tr>
-                <th>Host</th>
-                <th>Chunk Size</th>
-                <th>Rollover Avg.</th>
-                <th>Rollover Std. Dev.</th>
-                <th>Rollover Variance</th>
-                <th>CPU Avg.</th>
-                <th>CPU Std. Dev.</th>
-                <th>CPU Variance</th>
-                <th>Memory Avg.</th>
-                <th>Memory Std. Dev.</th>
-                <th>Memory Variance</th>
+                <th><abbr title="Client running the benchmark.">Host</abbr></th>
+                <th><abbr title="MB's written to a file at a time.">Chunk Size</abbr></th>
+                <th><abbr title="Average time (seconds) it took to write a single file.">Rollover Avg.</abbr></th>
+                <th><abbr title="Standard deviation (seconds) for writing a single file.">Rollover Std. Dev.</abbr></th>
+                <th><abbr title="Statistical variance (seconds) for writing a single file.">Rollover Variance</abbr></th>
+                <th><abbr title="Average *additional* CPU usage (percent) while running the benchmark.">CPU Avg.</abbr></th>
+                <th><abbr title="Standard deviation (percent) for writing all files.">CPU Std. Dev.</abbr></th>
+                <th><abbr title="Statistical variance (percent) for writing all files.">CPU Variance</abbr></th>
+                <th><abbr title="Memory consumption (MB) prior to running the benchmark.">Initial Memory</abbr></th>
+                <th><abbr title="Average memory consumption (MB) while running the benchmark.">Memory Avg.</abbr></th>
                 <th>Status</th>
             </tr>
         </thead>
@@ -44,9 +43,8 @@
                 <td>{{ci_stats['cpu_util_mean']}}</td>
                 <td>{{ci_stats['cpu_util_stdev']}}</td>
                 <td>{{ci_stats['cpu_util_variance']}}</td>
+                <td>{{ci_stats['initial_mem_usage']}}</td>
                 <td>{{ci_stats['mem_usage_mean']}}</td>
-                <td>{{ci_stats['mem_usage_stdev']}}</td>
-                <td>{{ci_stats['mem_usage_variance']}}</td>
                 <td class="{{status}}">{{state}}</td>
             </tr>
             % end

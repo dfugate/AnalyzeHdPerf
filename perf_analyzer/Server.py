@@ -210,6 +210,10 @@ class Server(object):
             ts = datetime.strptime(ts_str, DATETIME_FORMAT)
             client_info = self.client_info_dict[client_id]
             client_info.started = ts
+
+            mem_usage = bottle.request.json[MEM_USAGE]
+            client_info.initial_mem_usage = mem_usage
+
             self.l.info("Client start - %s at %s" % (client_id, ts.isoformat()))
 
         return {}

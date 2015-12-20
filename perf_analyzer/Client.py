@@ -130,11 +130,11 @@ def monitor_resources(sleep_time):
     """
     while running:
         cpu_percent = psutil.cpu_percent(sleep_time)  # sleeps for args.monitoring_interval seconds
-        swap_memory = psutil.swap_memory()
+        virtual_memory = psutil.virtual_memory()
         inform_server(RESOURCES_PATH,
                       {
                         CPU_UTIL: cpu_percent,
-                        MEM_USAGE: swap_memory.percent
+                        MEM_USAGE: int(virtual_memory.used/1000000)
                       })
     return
 
@@ -246,10 +246,12 @@ if __name__ == "__main__":
     l.info('Started at "%s".' % str(start_time))
     inform_server(START_PATH,
                   {
-                    'timestamp': get_timestamp(start_time)
+                    'timestamp': get_timestamp(start_time),
+                    MEM_USAGE: int(psutil.virtual_memory().used/1000000)
                   })
 
     running = True
+    psutil.cpu_percent(None)  # Initializes psutil
 
     monitor_resources_thread.start()
     heartbeat_thread.start()

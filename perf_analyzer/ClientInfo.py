@@ -62,6 +62,7 @@ class ClientInfo(object):
         self.heartbeats = []
         self.resources = []
         self.rollovers = []
+        self.initial_mem_usage = None
 
         self.kicked_off = None
         self.done = False
@@ -185,19 +186,21 @@ class ClientInfo(object):
                 last_time = self.rollovers[i]
 
             ret_val['rollover_mean'] = self.num_to_seconds(mean(rollover_times))
-            ret_val['rollover_median'] = self.num_to_seconds(median(rollover_times))
             ret_val['rollover_stdev'] = self.num_to_seconds(stdev(rollover_times))
             ret_val['rollover_variance'] = self.num_to_seconds(variance(rollover_times))
         else:
             ret_val['rollover_mean'] = not_applicable
-            ret_val['rollover_median'] = not_applicable
             ret_val['rollover_stdev'] = not_applicable
             ret_val['rollover_variance'] = not_applicable
+
+        if self.initial_mem_usage is None:
+            ret_val['initial_mem_usage'] = not_applicable
+        else:
+            ret_val['initial_mem_usage'] = self.num_to_megabytes(self.initial_mem_usage)
 
         if len(self.resources) > 0:
             cpu_util_list = [x[1] for x in self.resources]
             ret_val['cpu_util_mean'] = self.num_to_percent(mean(cpu_util_list))
-            ret_val['cpu_util_median'] = self.num_to_percent(median(cpu_util_list))
             ret_val['cpu_util_stdev'] = self.num_to_percent(stdev(cpu_util_list))
             if len(cpu_util_list) > 1:
                 ret_val['cpu_util_variance'] = self.num_to_percent(variance(cpu_util_list))
@@ -206,22 +209,12 @@ class ClientInfo(object):
 
             mem_usage_list = [x[2] for x in self.resources]
             ret_val['mem_usage_mean'] = self.num_to_megabytes(mean(mem_usage_list))
-            ret_val['mem_usage_median'] = self.num_to_megabytes(median(mem_usage_list))
-            ret_val['mem_usage_stdev'] = self.num_to_megabytes(stdev(mem_usage_list))
-            if len(mem_usage_list) > 1:
-                ret_val['mem_usage_variance'] = self.num_to_megabytes(variance(mem_usage_list))
-            else:
-                ret_val['mem_usage_variance'] = not_applicable
         else:
             ret_val['cpu_util_mean'] = not_applicable
-            ret_val['cpu_util_median'] = not_applicable
             ret_val['cpu_util_stdev'] = not_applicable
             ret_val['cpu_util_variance'] = not_applicable
             
             ret_val['mem_usage_mean'] = not_applicable
-            ret_val['mem_usage_median'] = not_applicable
-            ret_val['mem_usage_stdev'] = not_applicable
-            ret_val['mem_usage_variance'] = not_applicable
 
         return ret_val
 
@@ -231,7 +224,7 @@ class ClientInfo(object):
         :param num: Number to convert.
         :return: See description.
         """
-        return '{:5.2f}%'.format(num)
+        return '{:4.1f}%'.format(num)
 
     def num_to_seconds(self, num):
         """
@@ -247,7 +240,7 @@ class ClientInfo(object):
         :param num: Number to convert.
         :return: See description.
         """
-        return '{:.2f} MB'.format(num)
+        return '{:.1f} MB'.format(num)
 
     def to_json(self):
         """
