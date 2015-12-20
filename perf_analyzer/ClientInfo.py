@@ -7,18 +7,18 @@
 # a letter to Creative Commons, PO Box 1866, Mountain View, CA 94042, USA.
 # ----------------------------------------------------------------------------------------------------------------------
 
-from subprocess import Popen
+from datetime import datetime, timedelta
 from os import getlogin, path, devnull, sep
 from socket import gethostname, gethostbyname
-from datetime import datetime, timedelta
+from subprocess import Popen
 
 from perf_analyzer import *
-
 from statistics import mean, stdev, variance
 
 # --GLOBALS-------------------------------------------------------------------------------------------------------------
 MAX_MISSED_HEARTBEATS = 3
 DEVNULL = open(devnull, 'w')
+
 
 # ----------------------------------------------------------------------------------------------------------------------
 
@@ -26,6 +26,7 @@ class ClientInfo(object):
     """
     Responsible for holding benchmarking data on a single client.
     """
+
     def __init__(self,
                  l,
                  hostname,
@@ -76,7 +77,7 @@ class ClientInfo(object):
         if self.done:
             # Previous invocation has determined this client is done...great!
             return True
-        elif not(self.stopped is None):
+        elif not (self.stopped is None):
             # Completed since the last check_status invocation...great!
             self.done = True
             return True
@@ -176,10 +177,10 @@ class ClientInfo(object):
         ret_val = {}
         not_applicable = 'N/A'
 
-        if len(self.rollovers) > 1: # Skip the last rollover...it could've been smaller than chunk_size
+        if len(self.rollovers) > 1:  # Skip the last rollover...it could've been smaller than chunk_size
             rollover_times = []
             last_time = self.started
-            for i in xrange(len(self.rollovers)-1):
+            for i in xrange(len(self.rollovers) - 1):
                 rollover_times.append(
                     (self.rollovers[i] - last_time).total_seconds()
                 )
@@ -213,7 +214,7 @@ class ClientInfo(object):
             ret_val['cpu_util_mean'] = not_applicable
             ret_val['cpu_util_stdev'] = not_applicable
             ret_val['cpu_util_variance'] = not_applicable
-            
+
             ret_val['mem_usage_mean'] = not_applicable
 
         return ret_val
@@ -256,15 +257,17 @@ class ClientInfo(object):
         ret_val += "'resources':["
         for i in xrange(len(self.resources)):
             resource = self.resources[i]
-            ret_val += "[" + str(self.__timestamp_helper(resource[0])) + "," + str(resource[1]) + "," + str(resource[2]) + "]"
-            if i != (len(self.resources)-1):
+            ret_val += "[" + str(self.__timestamp_helper(resource[0])) + "," + str(resource[1]) + "," + str(
+                resource[2]) + "]"
+
+            if i != (len(self.resources) - 1):
                 ret_val += ","
 
         ret_val += "],\n'rollovers':["
         for i in xrange(len(self.rollovers)):
             ro = self.rollovers[i]
             ret_val += str(self.__timestamp_helper(ro))
-            if i != (len(self.rollovers)-1):
+            if i != (len(self.rollovers) - 1):
                 ret_val += ","
 
         ret_val += "]}\n"
@@ -274,8 +277,10 @@ class ClientInfo(object):
 # --MAIN----------------------------------------------------------------------------------------------------------------
 if __name__ == "__main__":
     import logging
+
     ci = ClientInfo(logging.getLogger("testClientInfo"),
                     "localhost",
+                    "8080",
                     10,
                     10,
                     20,

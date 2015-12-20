@@ -7,19 +7,18 @@
 # a letter to Creative Commons, PO Box 1866, Mountain View, CA 94042, USA.
 # ----------------------------------------------------------------------------------------------------------------------
 
-import sys
-import threading
-import tempfile
-import shutil
-import logging
 import json
-import urllib2
+import logging
 import logging.handlers
-
+import shutil
+import sys
+import tempfile
+import threading
+import urllib2
 from argparse import ArgumentParser
 from datetime import datetime, timedelta
-from socket import gethostname, gethostbyname
 from os import sep, getcwd
+from socket import gethostname, gethostbyname
 from time import sleep
 
 try:
@@ -100,7 +99,7 @@ def do_work(work_dir, chunk_size, file_size, benchmark_duration):
                 if final_chunk_str != "":
                     f.write(final_chunk_str)
                     f.flush()
-                
+
             l.info('Rollover (%d)' % file_unique_id)
             inform_server(ROLLOVER_PATH, {})
 
@@ -133,10 +132,11 @@ def monitor_resources(sleep_time):
         virtual_memory = psutil.virtual_memory()
         inform_server(RESOURCES_PATH,
                       {
-                        CPU_UTIL: cpu_percent,
-                        MEM_USAGE: int(virtual_memory.used/1000000)
+                          CPU_UTIL: cpu_percent,
+                          MEM_USAGE: int(virtual_memory.used / 1000000)
                       })
     return
+
 
 def sanity_check_perf(file_size, chunk_size, benchmark_duration, work_dir):
     """
@@ -156,7 +156,7 @@ def sanity_check_perf(file_size, chunk_size, benchmark_duration, work_dir):
     time_diff = (datetime.utcnow() - t0).total_seconds()
 
     # Time needed to write one file
-    estimated_file_duration = (float(file_size)/chunk_size) * time_diff
+    estimated_file_duration = (float(file_size) / chunk_size) * time_diff
 
     # Estimated number of files that can be created.
     estimated_total_files = benchmark_duration / estimated_file_duration
@@ -240,14 +240,15 @@ if __name__ == "__main__":
     # -- The Good Stuff -------------------------------------------------------
     monitor_resources_thread = threading.Thread(target=monitor_resources, args=(args.monitoring_interval,))
     heartbeat_thread = threading.Thread(target=heartbeat, args=())
-    do_work_thread = threading.Thread(target=do_work, args=(temp_dir, args.chunk_size, args.file_size, args.benchmark_time))
+    do_work_thread = threading.Thread(target=do_work,
+                                      args=(temp_dir, args.chunk_size, args.file_size, args.benchmark_time))
 
     start_time = datetime.utcnow()
     l.info('Started at "%s".' % str(start_time))
     inform_server(START_PATH,
                   {
-                    'timestamp': get_timestamp(start_time),
-                    MEM_USAGE: int(psutil.virtual_memory().used/1000000)
+                      'timestamp': get_timestamp(start_time),
+                      MEM_USAGE: int(psutil.virtual_memory().used / 1000000)
                   })
 
     running = True

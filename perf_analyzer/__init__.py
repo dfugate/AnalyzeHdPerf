@@ -7,16 +7,15 @@
 # a letter to Creative Commons, PO Box 1866, Mountain View, CA 94042, USA.
 # ----------------------------------------------------------------------------------------------------------------------
 
-import sys
 import logging
 import logging.handlers
+import sys
 
 # --SANITY CHECKS-------------------------------------------------------------------------------------------------------
 
 if sys.version_info.major != 2 and sys.version_info.minor != 7:
     print "This version of Python (" + sys.version + ") is not supported! Please install 2.7."
     sys.exit(1)
-
 
 # --GLOBALS-------------------------------------------------------------------------------------------------------------
 
@@ -38,6 +37,7 @@ MEM_USAGE = 'mem_usage'
 # Other
 LOG_FORMAT = '%(asctime)-15s - %(levelname)-8s - %(message)s'
 DATETIME_FORMAT = '%Y_%m_%d_%H_%M_%S_%f'
+
 
 # --HELPER FUNCTIONS ---------------------------------------------------------------------------------------------------
 
@@ -75,11 +75,13 @@ def sanity_check_config(args):
         print "Resource monitoring interval (%s) must be larger than the benchmark time (%s). Bailing!" % (args.monitoring_interval, args.benchmark_time)
         sys.exit(1)
 
-#-----------------------------------------------------------------------------------------------------------------------
+
+# -----------------------------------------------------------------------------------------------------------------------
 class PersistentBufferingHandler(logging.handlers.BufferingHandler):
     """
     Subclass of BufferingHandler which *never* throws lows away.
     """
+
     def flush(self):
         """
         Overridden

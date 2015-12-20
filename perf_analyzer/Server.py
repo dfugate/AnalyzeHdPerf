@@ -7,15 +7,13 @@
 # a letter to Creative Commons, PO Box 1866, Mountain View, CA 94042, USA.
 # ----------------------------------------------------------------------------------------------------------------------
 
-import sys
 import logging
-
-from socket import gethostname
 from argparse import ArgumentParser
 from datetime import datetime
-from time import sleep
-from threading import Thread
 from os import getcwd, sep
+from socket import gethostname
+from threading import Thread
+from time import sleep
 
 from perf_analyzer import *
 from perf_analyzer.ClientInfo import ClientInfo
@@ -37,6 +35,7 @@ class Server(object):
     Controls execution of benchmarks on client machines and also handles incoming
     HTTP requests.
     """
+
     def __init__(self,
                  client_hostnames,
                  benchmark_time,
