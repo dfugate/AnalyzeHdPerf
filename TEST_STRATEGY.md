@@ -170,3 +170,8 @@ local to the machine. This may not always be the case.
 which can in turn break this tool.
 * if this application and tests are run against a virtual operating system,
 there's a definite possibility that the performance metrics could be incorrect.
+* the ability for a client to refuse to run a benchmark in which it can't handle
+at least two file rollovers is based on estimated disk-write throughput and
+can be inaccurate due to the overhead of other processes.
+* setting up a UNIX box to accept remote HTTP requests on port 8080 (default TCP
+port for this web app) can be challenging.
